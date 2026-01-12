@@ -1,8 +1,21 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// Always use process.env.API_KEY directly for initialization as per guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+function getApiKey(): string | undefined {
+  // Vite exposes only `VITE_*` env vars to the browser by default.
+  // Note: this is client-side — the key will be visible to users. For production, proxy through a server.
+  return import.meta.env.VITE_GEMINI_API_KEY;
+}
+
+function getClient(): GoogleGenAI {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error(
+      "Missing API key. Set VITE_GEMINI_API_KEY in .env.local (or your deployment environment)."
+    );
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
 export const getGroomingAdvice = async (breed: string, coatCondition: string, lastGroom: string) => {
   const prompt = `
@@ -22,6 +35,7 @@ export const getGroomingAdvice = async (breed: string, coatCondition: string, la
   `;
 
   try {
+    const ai = getClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -34,6 +48,9 @@ export const getGroomingAdvice = async (breed: string, coatCondition: string, la
     return response.text;
   } catch (error) {
     console.error("Gemini API Error:", error);
+    if (error instanceof Error && /Missing API key/i.test(error.message)) {
+      return "Our grooming assistant isn't configured yet. Add VITE_GEMINI_API_KEY to .env.local and refresh, or just call us at (513) 555-0123 and we'll help you out.";
+    }
     return "I'm sorry, my system is acting up. Since we're a small shop, the best thing to do is just call us at (513) 555-0123. We'll give you better advice over the phone!";
   }
 };
